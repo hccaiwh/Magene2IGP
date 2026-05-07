@@ -1,18 +1,39 @@
+"""
+迈金(Onelap/Magene)平台 API 封装
+提供登录、获取活动列表、下载FIT文件等功能
+"""
 import requests
-from utils import safe_sleep
+from typing import Optional, List, Dict, Any
+from utils import safe_sleep, print_colored
 
 BASE_API = "https://api.onelap.cn"
 UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
 
+
 class OnelapMagene:
-    def __init__(self, username, password):
+    """迈金平台API封装类"""
+    
+    def __init__(self, username: str, password: str):
+        """
+        初始化迈金API客户端
+        
+        Args:
+            username: 用户名/手机号
+            password: 密码
+        """
         self.username = username
         self.password = password
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": UA})
-        self.token = None
+        self.token: Optional[str] = None
 
-    def login(self):
+    def login(self) -> bool:
+        """
+        登录迈金平台
+        
+        Returns:
+            登录是否成功
+        """
         url = f"{BASE_API}/v1/auth/login"
         payload = {
             "username": self.username,
@@ -20,45 +41,95 @@ class OnelapMagene:
             "grant_type": "password",
             "client_id": "onelap_app"
         }
+        
         try:
             resp = self.session.post(url, json=payload, timeout=15)
+            resp.raise_for_status()
             data = resp.json()
+            
             self.token = data.get("access_token")
             if not self.token:
-                raise Exception("未获取到token，登录失败")
-            print("✅ 迈金顽鹿登录成功")
+                print("❌ 登录失败：未获取到token")
+                return False
+            
+            print("✅ 迈金登录成功")
             return True
-        except Exception as e:
+            
+        except requests.exceptions.RequestException as e:
             print(f"❌ 迈金登录失败: {e}")
             return False
+        except (KeyError, ValueError) as e:
+            print(f"❌ 解析登录响应失败: {e}")
+            return False
 
-    def get_activity_list(self, page=1, limit=5):
+    def get_activity_list(self, page: int = 1, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        获取活动列表
+        
+        Args:
+            page: 页码
+            limit: 每页数量
+            
+        Returns:
+            活动列表
+        """
         if not self.token:
+            print("⚠️ 未登录，无法获取活动列表")
             return []
+
         url = f"{BASE_API}/v1/activities"
         headers = {"Authorization": f"Bearer {self.token}"}
         params = {"page": page, "limit": limit}
+        
         try:
             resp = self.session.get(url, headers=headers, params=params, timeout=15)
+            resp.raise_for_status()
             data = resp.json()
-            return data.get("data", {}).get("list", [])
-        except Exception as e:
-            print(f"❌ 获取运动列表失败: {e}")
+            activities = data.get("data", {}).get("list", [])
+            print(f"ℹ️ 获取到 {len(activities)} 个活动")
+            return activities
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ 获取活动列表失败: {e}")
+            return []
+        except (KeyError, ValueError) as e:
+            print(f"❌ 解析活动列表失败: {e}")
             return []
 
-    def download_fit(self, activity_id, save_dir):
+    def download_fit(self, activity_id: str, save_dir: str) -> Optional[str]:
+        """
+        下载FIT文件
+        
+        Args:
+            activity_id: 活动ID
+            save_dir: 保存目录
+            
+        Returns:
+            保存路径，失败返回None
+        """
         if not self.token:
+            print("⚠️ 未登录，无法下载文件")
             return None
+
         url = f"{BASE_API}/v1/activities/{activity_id}/download_fit"
         headers = {"Authorization": f"Bearer {self.token}"}
+        
         try:
             resp = self.session.get(url, headers=headers, stream=True, timeout=30)
+            resp.raise_for_status()
+            
             save_path = f"{save_dir}/{activity_id}.fit"
             with open(save_path, "wb") as f:
                 for chunk in resp.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            print(f"📥 下载FIT完成: {activity_id}.fit")
+                    if chunk:
+                        f.write(chunk)
+            
+            print(f"✅ 下载FIT文件成功: {activity_id}.fit")
             return save_path
-        except Exception as e:
-            print(f"❌ 下载FIT失败 {activity_id}: {e}")
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ 下载FIT文件失败 {activity_id}: {e}")
+            return None
+        except IOError as e:
+            print(f"❌ 保存FIT文件失败 {activity_id}: {e}")
             return None
