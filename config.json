@@ -1,0 +1,12 @@
+{
+  "magene": {
+    "username": "YOUR_MAGENE_USERNAME",
+    "password": "YOUR_MAGENE_PASSWORD"
+  },
+  "igpsport": {
+    "username": "YOUR_IGSPORT_USERNAME",
+    "password": "YOUR_IGSPORT_PASSWORD"
+  },
+  "limit": 5,
+  "delay_sec": 2
+}
