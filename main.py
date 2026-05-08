@@ -138,7 +138,7 @@ def main() -> None:
     
     # 获取活动列表
     logger.info(f"\n📋 正在获取最近 {limit} 条运动记录...")
-    act_list = magene.get_activity_list(page=1, limit=limit)
+    act_list = magene.get_activity_list(limit=limit)
     
     if not act_list:
         logger.info("ℹ️ 未获取到迈金运动记录")
@@ -151,7 +151,8 @@ def main() -> None:
     skip_count = 0
     
     for act in act_list:
-        act_id = act.get("id")
+        # 提取活动唯一ID（适配新API返回格式）
+        act_id = act.get("fitUrl") or act.get("fileKey") or str(act.get("id", ""))
         if not act_id:
             continue
         
@@ -161,9 +162,9 @@ def main() -> None:
             skip_count += 1
             continue
         
-        # 下载FIT文件
+        # 下载FIT文件（传入整个activity字典）
         logger.info(f"\n===== 开始同步新运动ID: {act_id} =====")
-        fit_path = magene.download_fit(str(act_id), save_dir)
+        fit_path = magene.download_fit(act, save_dir)
         
         if not fit_path:
             logger.warning(f"⚠️ 下载失败，跳过运动ID {act_id}")
