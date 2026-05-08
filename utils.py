@@ -3,12 +3,13 @@
 提供文件操作、目录创建、同步记录管理等功能
 """
 import time
-import json
+import logging
 from pathlib import Path
 from typing import Set
 
-SYNC_RECORD_FILE = "synced_ids.txt"
+logger = logging.getLogger(__name__)
 
+SYNC_RECORD_FILE = "synced_ids.txt"
 
 def make_save_dir(dir_name: str = "fit_files") -> str:
     """
@@ -16,13 +17,12 @@ def make_save_dir(dir_name: str = "fit_files") -> str:
     
     Args:
         dir_name: 目录名称
-        
+    
     Returns:
         创建的目录路径
     """
     Path(dir_name).mkdir(parents=True, exist_ok=True)
     return dir_name
-
 
 def safe_sleep(sec: int) -> None:
     """
@@ -32,7 +32,6 @@ def safe_sleep(sec: int) -> None:
         sec: 休眠秒数
     """
     time.sleep(sec)
-
 
 def get_synced_ids() -> Set[str]:
     """
@@ -50,9 +49,8 @@ def get_synced_ids() -> Set[str]:
         with open(sync_file, "r", encoding="utf-8") as f:
             return set(line.strip() for line in f if line.strip())
     except Exception as e:
-        print(f"⚠️ 读取同步记录失败: {e}")
+        logger.warning(f"⚠️ 读取同步记录失败: {e}")
         return set()
-
 
 def save_synced_id(act_id: str) -> None:
     """
@@ -68,6 +66,6 @@ def save_synced_id(act_id: str) -> None:
         try:
             with open(sync_file, "a", encoding="utf-8") as f:
                 f.write(f"{act_id}\n")
-            print(f"✅ 活动ID {act_id} 已保存到同步记录")
+            logger.info(f"✅ 活动ID {act_id} 已保存到同步记录")
         except Exception as e:
-            print(f"❌ 保存同步记录失败: {e}")
+            logger.error(f"❌ 保存同步记录失败: {e}")

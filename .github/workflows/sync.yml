@@ -1,17 +1,15 @@
 name: Sync Magene to IGPSPORT
-
 on:
-  # 手动触发（自动触发已关闭）
+  # 手动触发
   workflow_dispatch:
-
-  # 定时触发已关闭 - 如需启用请取消注释
+  # 定时触发（如需启用请取消注释，每周一 8点 北京时间）
   # schedule:
   #   - cron: '0 0 * * 1'
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10 # 超时保护，任务最多运行10分钟
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,12 +24,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download synced IDs from previous run
-        uses: actions/download-artifact@v4
+      - name: Restore synced IDs cache
+        uses: actions/cache@v4
         with:
-          name: synced-ids
-          path: .
-        continue-on-error: true
+          path: synced_ids.txt
+          key: synced-ids-cache
 
       - name: Run sync script
         env:
@@ -40,11 +37,3 @@ jobs:
           LIMIT: ${{ secrets.LIMIT || 5 }}
           DELAY_SEC: ${{ secrets.DELAY_SEC || 2 }}
         run: python main.py
-
-      - name: Upload synced IDs as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: synced-ids
-          path: synced_ids.txt
-          retention-days: 90

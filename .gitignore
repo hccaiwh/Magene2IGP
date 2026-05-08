@@ -19,12 +19,10 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
 # Virtual Environment
 venv/
 ENV/
 env/
-
 # IDEs
 .vscode/
 .idea/
@@ -32,19 +30,17 @@ env/
 *.swo
 *~
 .DS_Store
-
 # Logs
 *.log
-
 # Testing
 .coverage
 .pytest_cache/
 htmlcov/
-
-# Config - 保留示例配置，忽略实际配置
-# config.json 已经在仓库中，如果需要忽略本地配置请取消注释
-# config.json
-
+# Config - 忽略本地实际配置，防止密码泄露
+config.json
+# 临时文件和同步记录
+fit_files/
+synced_ids.txt
 # 其他
 *.bak
 *.tmp
