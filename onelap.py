@@ -9,7 +9,7 @@ from utils import safe_sleep
 
 logger = logging.getLogger(__name__)
 
-BASE_API = "https://api.onelap.cn"
+BASE_API = "https://otm.onelap.cn"
 UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
 
 class OnelapMagene:
