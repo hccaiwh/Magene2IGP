@@ -1,15 +1,18 @@
 name: Sync Magene to IGPSPORT
 on:
+  # 每天北京时间 6:00 自动执行（UTC 22:00）
+  schedule:
+    - cron: '0 22 * * *'
   # 手动触发
   workflow_dispatch:
-  # 定时触发（如需启用请取消注释，每周一 8点 北京时间）
-  # schedule:
-  #   - cron: '0 0 * * 1'
+  # Star 仓库触发（跟参考项目一致）
+  watch:
+    types: [started]
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 10 # 超时保护，任务最多运行10分钟
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,6 +37,6 @@ jobs:
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
-          LIMIT: ${{ secrets.LIMIT || 5 }}
-          DELAY_SEC: ${{ secrets.DELAY_SEC || 2 }}
+          LIMIT: ${{ secrets.LIMIT || '5' }}
+          DELAY_SEC: ${{ secrets.DELAY_SEC || '2' }}
         run: python main.py

@@ -10,18 +10,16 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# 优先使用 i.igpsport.com（国内/国际均可访问，my.igpsport.com 在海外CI Connection refused）
-# 两个域名的登录响应格式不同，login() 会自动兼容：
-#   - my.igpsport.com → Set-Cookie 方式（redirect + loginTicket）
-#   - i.igpsport.com  → JSON 方式（{"Code":200,"Data":...}）
-IGP_HOST = "i.igpsport.com"
+# GitHub Actions 可正常访问 my.igpsport.com（参考 IGPSPORT2Xingzhe 项目验证）
+# i.igpsport.com 也可用，但登录返回 JSON 格式，认证方式不同
+IGP_HOST = "my.igpsport.com"
 LOGIN_URL = f"https://{IGP_HOST}/Auth/Login"
 ACTIVITY_URL = f"https://{IGP_HOST}/Activity/ActivityList"
 UPLOAD_URL = f"https://{IGP_HOST}/Activity/UploadFit"
 
 
 class IGPSPORT:
-    """IGPSPORT平台API封装类（兼容 my / i 两个域名）"""
+    """IGPSPORT平台API封装类"""
 
     def __init__(self, username: str, password: str):
         self.username = username
@@ -50,9 +48,11 @@ class IGPSPORT:
 
     def login(self) -> bool:
         """
-        登录IGPSPORT平台，自动兼容两种响应格式：
-        - Cookie 方式（my.igpsport.com）：检查 Set-Cookie 中的 loginTicket
-        - JSON 方式（i.igpsport.com）：解析 {"Code":200,"Data":...}
+        登录IGPSPORT平台
+        - 接口：POST https://my.igpsport.com/Auth/Login
+        - 密码明文 Form POST
+        - 从 Set-Cookie 提取 loginTicket（登录成功标志）和 loginToken（后续认证用）
+        - 参考：https://github.com/kvnZero/IGPSPORT2Xingzhe
         """
         payload = {
             "username": self.username,
@@ -61,73 +61,33 @@ class IGPSPORT:
 
         try:
             resp = self.session.post(LOGIN_URL, data=payload, timeout=15)
-            # 不调用 raise_for_status()，因为登录失败也返回 200 + JSON错误体
-            logger.debug(f"登录响应状态码: {resp.status_code}")
-            logger.debug(f"登录响应 Content-Type: {resp.headers.get('Content-Type','')}")
-            logger.debug(f"登录响应体: {resp.text[:300]}")
+            resp.raise_for_status()
 
-            content_type = resp.headers.get("Content-Type", "")
-
-            # ===== 情况1：JSON 响应（i.igpsport.com 风格）=====
-            if "application/json" in content_type:
-                try:
-                    data = resp.json()
-                except ValueError:
-                    logger.error(f"❌ 登录响应不是合法JSON: {resp.text[:200]}")
-                    return False
-
-                code = data.get("Code") or data.get("code")
-                if code == 200:
-                    # 成功：从 Data 字段提取 token
-                    token_data = data.get("Data") or data.get("data")
-                    if isinstance(token_data, str) and token_data:
-                        self.login_token = token_data
-                    elif isinstance(token_data, dict):
-                        self.login_token = (
-                            token_data.get("token")
-                            or token_data.get("access_token")
-                            or token_data.get("loginToken")
-                        )
-                    else:
-                        logger.error(f"❌ 无法从响应 Data 中提取 token: {token_data}")
-                        return False
-
-                    self.session.headers.update({
-                        "Authorization": f"Bearer {self.login_token}"
-                    })
-                    logger.info("✅ IGPSPORT 登录成功（JSON模式）")
-                    return True
-                else:
-                    msg = data.get("Message") or data.get("message", "未知错误")
-                    logger.error(f"❌ IGPSPORT 登录失败: {msg} (Code: {code})")
-                    return False
-
-            # ===== 情况2：Cookie 响应（my.igpsport.com 风格）=====
+            # 拼接所有 Set-Cookie（可能有多个）
+            if hasattr(resp.headers, "getlist"):
+                all_cookies = ", ".join(resp.headers.getlist("Set-Cookie"))
             else:
-                # 拼接所有 Set-Cookie 头（requests 可能返回逗号分隔或列表）
-                if hasattr(resp.headers, "getlist"):
-                    all_cookies = ", ".join(resp.headers.getlist("Set-Cookie"))
-                else:
-                    all_cookies = resp.headers.get("Set-Cookie", "")
+                all_cookies = resp.headers.get("Set-Cookie", "")
 
-                logger.debug(f"Set-Cookie 内容: {all_cookies[:300]}")
+            # 检查 loginTicket（登录成功标志）
+            if "loginTicket" not in all_cookies:
+                logger.error(f"❌ IGPSPORT 登录失败：未获取到 loginTicket（账号/密码可能有误）")
+                logger.debug(f"响应内容: {resp.text[:300]}")
+                return False
 
-                if "loginTicket" not in all_cookies:
-                    logger.error("❌ IGPSPORT 登录失败：未获取到 loginTicket（账号/密码可能有误）")
-                    logger.debug(f"完整响应头: {dict(resp.headers)}")
-                    return False
+            # 提取 loginToken
+            match = re.search(r"loginToken=(.*?);", all_cookies)
+            if not match or not match.group(1):
+                logger.error("❌ IGPSPORT 登录失败：未解析到 loginToken")
+                return False
 
-                match = re.search(r"loginToken=(.*?);", all_cookies)
-                if not match or not match.group(1):
-                    logger.error("❌ IGPSPORT 登录失败：未解析到 loginToken")
-                    return False
+            self.login_token = match.group(1)
+            self.session.headers.update({
+                "Authorization": f"Bearer {self.login_token}"
+            })
 
-                self.login_token = match.group(1)
-                self.session.headers.update({
-                    "Authorization": f"Bearer {self.login_token}"
-                })
-                logger.info("✅ IGPSPORT 登录成功（Cookie模式）")
-                return True
+            logger.info("✅ IGPSPORT 登录成功")
+            return True
 
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ IGPSPORT 登录请求失败: {e}")
