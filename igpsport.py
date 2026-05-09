@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 # 国内版 IGPSPORT 域名
 # 国际版用 i.igpsport.com（本项目暂不支持）
-IGP_HOST = "my.igpsport.com"
+# 优先使用 i.igpsport.com（国际版/国内版均可访问）
+# my.igpsport.com 在国内可访问，但海外CI服务器 Connection refused
+IGP_HOST = "i.igpsport.com"
 LOGIN_URL = f"https://{IGP_HOST}/Auth/Login"
 ACTIVITY_URL = f"https://{IGP_HOST}/Activity/ActivityList"
 UPLOAD_URL = f"https://{IGP_HOST}/Activity/UploadFit"
